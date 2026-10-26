@@ -147,3 +147,12 @@ class BuildDetailOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+
+class CompatibilityReportOut(BaseModel):
+    build_id: int
+    is_compatible: bool
+    errors: List[str]
+    warnings: List[str]
+    total_estimated_wattage: int
+    recommended_psu_wattage: int
