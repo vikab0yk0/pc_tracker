@@ -4,9 +4,8 @@
 
 Распределённая система, построенная на базе FastAPI (REST API Gateway), изолированного gRPC-микросервиса валидации конфигураций, СУБД PostgreSQL, брокера сообщений RabbitMQ и WebSocket-уведомлений.
 
-Подробное описание предметной области, use cases и схемы БД — в [about.md](docs/about.md)
-
-Стратегия тестирования, тест-дизайн и матрица трассируемости — в [testing.md](docs/testing.md)
+* Подробное описание предметной области, use cases и схемы БД: в [about.md](docs/about.md)
+Стратегия тестирования, тест-дизайн и матрица трассируемости: [testing.md](docs/testing.md)
 
 ---
 
@@ -14,13 +13,13 @@
 
 ```mermaid
 graph TD
-    Client[Клиент: Web / Postman] -->|HTTP / REST + JWT| API[FastAPI Gateway]
-    API -->|SQLAlchemy 2.0| DB[(PostgreSQL)]
-    API -->|gRPC / Protobuf| GRPC[Compatibility Service]
+    Client["Клиент: Web / Postman"] -->|HTTP / REST + JWT| API["FastAPI Gateway"]
+    API -->|SQLAlchemy 2.0| DB[("PostgreSQL")]
+    API -->|gRPC / Protobuf| GRPC["Compatibility Service"]
     
-    Worker[Price Scraper Worker] -.->|Async Check| DB
-    Worker -.->|AMQP Events| Broker[RabbitMQ (Планируется)]
-    Broker -.->|Push| WS[WebSocket Service (Планируется)]
+    Worker["Price Scraper Worker"] -.->|Async Check| DB
+    Worker -.->|AMQP Events| Broker["RabbitMQ (Планируется)"]
+    Broker -.->|Push| WS["WebSocket Service (Планируется)"]
     WS -.->|Real-time Alert| Client
 ```
 
