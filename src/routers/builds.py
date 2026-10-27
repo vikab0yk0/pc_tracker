@@ -7,13 +7,17 @@ from src.database import get_db
 from src.models import User, Build, BuildItem
 from src.schemas import (
     BuildCreateIn, BuildCloneIn, BuildDetailOut,
-    BuildItemAddIn, BuildItemUpdateIn, BuildItemOut
+    BuildItemAddIn, BuildItemUpdateIn, BuildItemOut,
+    CompatibilityReportOut
 )
 from src.dependencies import get_current_user
 import src.crud as crud
+import grpc
+from src.grpc_services.client import CompatibilityGrpcClient
 
 
 router = APIRouter(prefix="/builds", tags=["Сборки ПК"])
+grpc_client = CompatibilityGrpcClient()
 
 
 @router.post("/", response_model=BuildDetailOut, status_code=status.HTTP_201_CREATED)
@@ -144,3 +148,36 @@ def update_slot_item(
     db.commit()
     db.refresh(item)
     return item
+
+
+
+@router.get("/{build_id}/compatibility", response_model=CompatibilityReportOut)
+def check_build_compatibility(
+    build_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)]
+):
+    """Запрашивает проверку совместимости компонентов сборки у отдельного gRPC-сервиса."""
+    build = db.get(Build, build_id)
+    if not build or build.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Сборка не найдена")
+
+    components_payload = []
+    for item in build.items:
+        if item.is_active_variant:
+            components_payload.append({
+                "category_slug": item.component_model.category.slug,
+                "model_name": item.component_model.name,
+                "quantity": item.quantity,
+                "specs": item.component_model.specs
+            })
+
+    try:
+        report = grpc_client.check_build(build_id=build.id, components_data=components_payload)
+        report["build_id"] = build.id
+        return report
+    except grpc.RpcError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Микросервис совместимости временно недоступен: {e.details() if hasattr(e, 'details') else str(e)}"
+        )

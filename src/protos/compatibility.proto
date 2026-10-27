@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package compatibility;
+
+message ComponentData {
+    string category_slug = 1;
+    string model_name = 2;
+    int32 quantity = 3;
+
+    string socket = 4;
+    int32 tdp = 5;
+    string ram_type = 6;
+    int32 ram_slots = 7;
+    int32 kit_count = 8;
+    int32 length_mm = 9;
+    int32 max_gpu_len_mm = 10;
+    int32 cooler_height_mm = 11;
+    int32 max_cooler_height_mm = 12;
+    int32 psu_wattage = 13;
+}
+
+message CompatibilityRequest {
+    int64 build_id = 1;
+    repeated ComponentData components = 2;
+}
+
+message CompatibilityResponse {
+    bool is_compatible = 1;
+    repeated string errors = 2;
+    repeated string warnings = 3;
+    int32 total_estimated_wattage = 4;
+    int32 recommended_psu_wattage = 5;
+}
+
+service CompatibilityService {
+    rpc CheckCompatibility(CompatibilityRequest) returns (CompatibilityResponse);
+}
