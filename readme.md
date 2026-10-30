@@ -5,7 +5,8 @@
 Распределённая система, построенная на базе FastAPI (REST API Gateway), изолированного gRPC-микросервиса валидации конфигураций, СУБД PostgreSQL, брокера сообщений RabbitMQ и WebSocket-уведомлений.
 
 * Подробное описание предметной области, use cases и схемы БД: в [about.md](docs/about.md)
-* Стратегия тестирования, тест-дизайн и матрица трассируемости: [testing.md](docs/testing.md)
+* Стратегия тестирования, тест-дизайн и матрица трассируемости: в [testing.md](docs/testing.md)
+* Архитектура и реализация парсера Wildberries: в [wildberries.md](docs/wildberries.md)
 
 ---
 
@@ -17,10 +18,15 @@ graph TD
     API -->|SQLAlchemy 2.0| DB[("PostgreSQL")]
     API -->|gRPC / Protobuf| GRPC["Compatibility Service"]
     
-    Worker["Price Scraper Worker"] -.->|Async Check| DB
-    Worker -.->|AMQP Events| Broker["RabbitMQ (Планируется)"]
-    Broker -.->|Push| WS["WebSocket Service (Планируется)"]
+    Worker["Price Scraper Worker"] -->|Playwright + Stealth| WB["Wildberries (WAF / API)"]
+    Worker -->|Sync Updates| DB
+    Worker -.->|PriceDropEvent| Broker["RabbitMQ (В разработке)"]
+
+    Broker -.->|Consume| WS["WebSocket Service (В разработке)"]
     WS -.->|Real-time Alert| Client
+
+    Broker -.->|Consume| TG["Telegram Bot (Планируется)"]
+    TG -.->|Push Alert| UserTG["Пользователь в Telegram"]
 ```
 
 ---
@@ -34,15 +40,16 @@ graph TD
 - **Контроль квот и тарифов:** жесткое ограничение на 12 активных отслеживаемых позиций для базового тарифа и безлимит для Premium.
 - **Двухуровневая модерация:** пользовательские модели поступают в статус `PENDING_REVIEW` и становятся глобальными только после ревью администратором.
 - **gRPC-микросервис (`CheckCompatibility`):** контракт на Protocol Buffers, валидация сокетов CPU/MB, типов памяти, габаритов GPU относительно корпуса и расчет суммарного энергопотребления с подбором мощности БП.
-- **Комплекс автотестов (Pytest):** 24 автоматизированных теста, покрывающих ORM-ограничения, бизнес-логику REST API и gRPC-контракт с соблюдением изоляции данных.
+- **Модуль сбора цен с Wildberries**: автономный парсинг карточек на headless Chromium (Playwright + Stealth) с обходом WAF-защиты, перехватом чистого JSON из внутреннего API витрины и надежным резервным контуром (DOM Fallback на CSS Modules). Контроль нагрузки через `asyncio.Semaphore`.
+- **Комплекс автотестов (Pytest):** 39 автоматизированных теста, покрывающих ORM-ограничения, бизнес-логику REST API, gRPC-контракт, регулярные выражения скрапера, сквозные сетевые проверки и тест надежности DOM-фолбэка.
 
 ### В разработке
-- Модульные скраперы для сбора цен с Wildberries, DNS и Ozon.
-- Фоновый воркер опроса с фильтрацией по неактивности учетной записи (TTL 30 дней).
+- **Событийная шина (RabbitMQ + aio-pika):** публикация событий `PriceDropEvent` при обнаружении снижения стоимости позиций воркером.
+- **Real-Time уведомления (WebSocket Service):** дуплексный канал доставки мгновенных оповещений об изменении цен прямо в открытую вкладку браузера пользователя.
 
 ### Запланировано
-- Публикация событий `PriceDropEvent` в брокер RabbitMQ при снижении цен.
-- Сервис уведомлений в реальном времени (Notification Service на WebSockets).
+- Telegram-бот для персональной отправки уведомлений о снижении цен в мессенджер.
+- Модульные скраперы для сбора цен с DNS и Ozon.
 - Серверный рендеринг веб-интерфейса (Jinja2).
 - Полная контейнеризация мультисервисной системы через Docker Compose.
 
@@ -54,8 +61,9 @@ graph TD
 - **Веб-сервер:** FastAPI, Uvicorn, Pydantic V2
 - **База данных:** PostgreSQL, SQLAlchemy 2.0, Alembic, psycopg3
 - **Микросервисное взаимодействие:** gRPC, Protocol Buffers
-- **Тестирование:** Pytest, Requests
-- **Асинхронные очереди и события (в планах):** RabbitMQ, aio-pika, WebSockets
+- **Сбор данных & Автоматизация:** Playwright, Playwright-Stealth
+- **Тестирование:** Pytest, Requests, pytest-asyncio, HTTPX
+- **Асинхронные очереди и события (в разработке):** RabbitMQ, aio-pika, WebSockets
 - **Инфраструктура (в планах):** Docker, Docker Compose
 
 ---
@@ -70,6 +78,7 @@ cd pc_tracker
 python -m venv venv
 # Активация: venv\Scripts\activate (Windows) или source venv/bin/activate (Linux/macOS)
 pip install -r requirements.txt
+playwright install chromium
 ```
 
 Создайте файл `.env` в корне проекта (на основе `.env.example`):
@@ -99,3 +108,4 @@ uvicorn src.main:app --reload --port 8000
 ```bash
 pytest
 ```
+Подробнее в [testing.md](docs/testing.md)

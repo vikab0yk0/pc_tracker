@@ -36,6 +36,12 @@ pytest tests/test_api.py
 
 # Только тесты удаленного взаимодействия (gRPC):
 pytest tests/test_grpc.py
+
+# Только тесты парсинга URL (WB):
+pytest tests/test_wb.py -k "UrlParsing"
+
+# 2. Только тесты с реальным браузером (WB):
+pytest tests/test_wb.py
 ```
 
 ##  Анализ граничных значений
@@ -68,6 +74,8 @@ pytest tests/test_grpc.py
 | **Email при регистрации** | Корректный синтаксис RFC 5322, уникальный в БД | Дубликат существующего адреса в БД; некорректный формат строки | 201 Created (валидный); 400 Bad Request (дубликат); 422 Unprocessable Entity (невалидный) |
 | **Роли доступа (RBAC)** | `ADMIN` (доступ к каталогу и модерации); `USER`, `PREMIUM` | Отсутствие токена; произвольная строка роли | 200/201 (ADMIN); 403 Forbidden (USER на админ-эндпоинтах); 401 Unauthorized (без токена) |
 | **Стоимость позиции** | Число с плавающей точкой / Decimal > 0 | Число $\le 0$, отрицательные значения, нечисловые типы | 200/201 (валидный); 422 Unprocessable Entity (невалидный) |
+| **URL карточки товара (WB)** | Валидный URL каталога с числовым артикулом (`catalog/<id>/...`) | Невалидный домен, отсутствие ID, текстовый ID (`catalog/abc`) | Извлечение ID строки (валидный); `ValueError` / `PARSING_ERROR` (невалидный) |
+| **Сетевой ответ витрины** | HTTP 200 + валидный payload `/cards/v4/detail` | HTTP 403 (WAF block); HTTP 404 / `products=[]`; капча | `SUCCESS` (валидный); `CAPTCHA_OR_BLOCKED`, `NOT_FOUND` (невалидный) |
 
 ## Тестирование переходов состояний
 
@@ -116,6 +124,15 @@ pytest tests/test_grpc.py
 | **REQ-RPC-02** | Детекция несовпадения процессорных сокетов | `CheckCompatibility` | 	`test_incompatible_sockets_detected` |
 | **REQ-RPC-03** | Контроль габаритов GPU относительно корпуса | `CheckCompatibility` | 	`test_gpu_case_dimension_conflict` |
 | **REQ-INT-01** | Сквозной вызов REST Gateway $\to$ gRPC Service | `GET /api/builds/{id}/compatibility` | 	`test_api_compatibility_endpoint` |
+
+### Уровень: WB
+| ID | Требование спецификации | Метод/Интерфейс | Идентификатор в Pytest |
+| :--- | :--- | :--- | :--- |
+| **REQ-WB-01** | Извлечение числового артикула из различных форматов ссылок WB | `WildberriesScraper.extract_item_id` | `test_extract_item_id_valid_formats` |
+| **REQ-WB-02** | Валидация некорректных ссылок и генерация статуса ошибки | `WildberriesScraper.scrape` | `test_scrape_corrupted_url_returns_parsing_error` |
+| **REQ-WB-03** | Сбор цены, названия и остатков активного товара через API | `WildberriesScraper.scrape` | `test_scrape_via_network_api` |
+| **REQ-WB-04** | Срабатывание DOM-fallback при недоступности сетевого API | `WildberriesScraper.scrape` | `test_scrape_dom_fallback_when_api_fails` |
+| **REQ-WB-05** | Идентификация удаленного/несуществующего товара (404) | `WildberriesScraper.scrape` | `test_scrape_non_existent_item_returns_not_found` |
 
 ## Архитектура изоляции тестовых данных
 
