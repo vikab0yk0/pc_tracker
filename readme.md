@@ -6,6 +6,7 @@
 
 * Подробное описание предметной области, use cases и схемы БД: в [about.md](docs/about.md)
 * Стратегия тестирования, тест-дизайн и матрица трассируемости: [testing.md](docs/testing.md)
+* Описание реализации модуля извлечения данных с [wildberries](docs/wildberries.md)
 
 ---
 
@@ -99,3 +100,4 @@ uvicorn src.main:app --reload --port 8000
 ```bash
 pytest
 ```
+Подробнее в [testing.md](docs/testing.md)
